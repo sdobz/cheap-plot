@@ -36,7 +36,7 @@ function intersectCircle(R, d, r) {
 }
 
 function sgn(n) {
-    return x < 0 ? -1 : 1;
+    return n < 0 ? -1 : 1;
 }
 
 function intersect(r, x1, y1, x2, y2) {
@@ -56,7 +56,7 @@ function intersect(r, x1, y1, x2, y2) {
             [(D * dy) / (dr * dr),
                 (-D * dx) / (dr * dr)
             ]
-        ]
+        ];
     } else {
         // two intersections
         return [
