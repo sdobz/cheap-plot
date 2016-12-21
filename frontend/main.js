@@ -342,8 +342,14 @@ hover.on('mousemove', function (event) {
 hover.on('mouseup', function (event) {
     endDrag = d3.mouse(this);
 
-    intersectPoints.render(lPulleyControls.intersect(startDrag, endDrag).concat(rPulleyControls.intersect(startDrag, endDrag)));
-    dragLineControls.show(startDrag, endDrag);
+    if (startDrag[0] - endDrag[0] != 0 || startDrag[1] - endDrag[1] != 0) {
+        dragLineControls.show(startDrag, endDrag);
+        intersectPoints.render(lPulleyControls.intersect(startDrag, endDrag).concat(rPulleyControls.intersect(startDrag, endDrag)));
+    }
+    else {
+        dragLineControls.hide();
+        intersectPoints.render([]);
+    }
 
     d3.event.stopPropagation();
 });

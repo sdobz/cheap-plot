@@ -1,5 +1,3 @@
-var TEST = true;
-
 function isFloat(n){
     return Number(n) === n && n % 1 !== 0;
 }
@@ -123,11 +121,9 @@ tests = {
     },
 }
 
-if (TEST) {
-    for (var key in tests) {
-       if (tests.hasOwnProperty(key)) {
-           console.log("Running", key);
-           tests[key]();
-       }
-    }
+for (var key in tests) {
+   if (tests.hasOwnProperty(key)) {
+       console.log("Running", key);
+       tests[key]();
+   }
 }
