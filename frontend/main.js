@@ -10,6 +10,7 @@ var PULLEYDISTANCE = 500,
     PULLEYLINELENGTH = 10,
     PULLEYLINESTROKE = 2,
     DEBUGLINESTROKE = 3,
+    INTERSECTIONRADIUS = 5,
     COLOR = {
         BG: '#eee',
         PLOTAREA: '#ddd',
@@ -17,24 +18,57 @@ var PULLEYDISTANCE = 500,
         PULLEYLINE: '#000',
         PLOTTER: 'yellow',
         BELT: '#000',
-        DEBUGLINE: '#f00'
+        DEBUGLINE: '#f00',
+        INTERSECTION: '#f0f',
     };
 
 
 // START MATH
 function distance(x1, y1, x2, y2) {
-    return Math.sqrt((x2 - x1)*(x2 - x1) + (y2 - y1)*(y2 - y1));
+    return Math.sqrt((x2 - x1) * (x2 - x1) + (y2 - y1) * (y2 - y1));
 }
 
 function intersectCircle(R, d, r) {
     // http://mathworld.wolfram.com/Circle-CircleIntersection.html
-    var x = (d*d - r*r + R*R)/(2*d);
-    var a = (1/d)*Math.sqrt((-d + r - R) * (-d - r + R) * (-d + r + R) * (d + r + R));
-    return [x, a/2];
+    var x = (d * d - r * r + R * R) / (2 * d);
+    var a = (1 / d) * Math.sqrt((-d + r - R) * (-d - r + R) * (-d + r + R) * (d + r + R));
+    return [x, a / 2];
 }
 
 function sgn(n) {
     return x < 0 ? -1 : 1;
+}
+
+function intersect(r, x1, y1, x2, y2) {
+    // http://mathworld.wolfram.com/Circle-LineIntersection.html
+    var dx = x2 - x1,
+        dy = y2 - y1,
+        dr = Math.sqrt(dx * dx + dy * dy),
+        D = x1 * y2 - x2 * y1,
+        dis = r * r * dr * dr - D * D;
+
+    if (dis < 0) {
+        // no intersections
+        return [];
+    } else if (dis == 0) {
+        // simplified case, tangent
+        return [
+            [(D * dy) / (dr * dr),
+                (-D * dx) / (dr * dr)
+            ]
+        ]
+    } else {
+        // two intersections
+        return [
+            [(D * dy + sgn(dy) * dx * Math.sqrt(dis)) / (dr * dr),
+                (-D * dx + Math.abs(dy) * Math.sqrt(dis)) / (dr * dr)
+            ],
+
+            [(D * dy - sgn(dy) * dx * Math.sqrt(dis)) / (dr * dr),
+                (-D * dx - Math.abs(dy) * Math.sqrt(dis)) / (dr * dr)
+            ]
+        ];
+    }
 }
 // END MATH
 
@@ -77,8 +111,8 @@ function drawPulley(cx) {
 
     pulley.append('line')
         .attr('x1', cx).attr('x2', cx)
-        .attr('y1', PADDING + PULLEYINSET - PULLEYRADIUS - PULLEYLINELENGTH/2)
-        .attr('y2', PADDING + PULLEYINSET - PULLEYRADIUS + PULLEYLINELENGTH/2)
+        .attr('y1', PADDING + PULLEYINSET - PULLEYRADIUS - PULLEYLINELENGTH / 2)
+        .attr('y2', PADDING + PULLEYINSET - PULLEYRADIUS + PULLEYLINELENGTH / 2)
         .attr('stroke-width', PULLEYLINESTROKE)
         .attr('stroke', COLOR.PULLEYLINE);
 
@@ -114,6 +148,27 @@ plotter.append('g')
     .attr('r', PLOTTERRADIUS)
     .attr('fill', COLOR.PLOTTER);
 
+function points(c, r) {
+    var pointCloud = svg.append('g');
+
+    return {
+        render: function (points) {
+            pointCloud.selectAll('*').remove();
+
+            for (var i = 0; i < points.length; i++) {
+                pointCloud.append('circle')
+                    .attr('class', 'points')
+                    .attr('cx', points[i][0])
+                    .attr('cy', points[i][1])
+                    .attr('r', r)
+                    .attr('fill', c);
+            }
+        }
+    }
+}
+
+var intersectPoints = points(COLOR.INTERSECTION, INTERSECTIONRADIUS)
+
 var hover = svg.append('rect')
     .attr('x', 0).attr('y', 0)
     .attr('width', svg.attr('width')).attr('height', svg.attr('height'))
@@ -130,34 +185,14 @@ function pulleyControls(pulley, conf) {
 
     var angle = 0;
     // Start in a right triangle
-    var length = Math.SQRT2/2 * PULLEYDISTANCE;
+    var length = Math.SQRT2 / 2 * PULLEYDISTANCE;
     dl.attr('r', length);
-
-    function intersect(r, x1a, y1a, x2a, y2a) {
-        // http://mathworld.wolfram.com/Circle-LineIntersection.html
-        var x1 = x1a - cx,
-            y1 = y1a - cy,
-            x2 = x2a - cx,
-            y2 = y2a - cy;
-
-        var dx = x2 - x1,
-            dy = y2 - y1,
-            dr = Math.sqrt(dx*dx + dy*dy),
-            D = x1*y2 - x2*y1,
-            dis = r*r * dr*dr - D*D;
-
-
-        var xi1 = (D*dy + sgn(dy) * dx * Math.sqrt(r*r * dr*dr - D*D)) / (dr*dr),
-            xi2 = (D*dy - sgn(dy) * dx * Math.sqrt(r*r * dr*dr - D*D)) / (dr*dr),
-            yi1 = (-D*dx + Math.abs(dy) * Math.sqrt(r*r * dr*dr - D*D)) / (dr*dr),
-            yi2 = (-D*dx + Math.abs(dy) * Math.sqrt(r*r * dr*dr - D*D)) / (dr*dr);
-    }
 
     return {
         rotate: function (deg) {
             angle += deg;
 
-            length += (deg * (Math.PI/180)) * PULLEYRADIUS * conf.dir;
+            length += (deg * (Math.PI / 180)) * PULLEYRADIUS * conf.dir;
 
             pulley.attr('transform', 'rotate(' + angle + ',' + cx + ',' + cy + ')');
             dl.attr('r', length);
@@ -165,9 +200,27 @@ function pulleyControls(pulley, conf) {
         distance: function (x, y) {
             return distance(cx, cy, x, y);
         },
-        length: function() { return length; },
-        x: function () { return cx; },
-        y: function () { return cy; }
+        intersect: function (start, end) {
+            var relStart = [start[0] - cx, start[1] - cy];
+            var relEnd = [end[0] - cx, end[1] - cy];
+
+            var intersections = intersect(length, relStart[0], relStart[1], relEnd[0], relEnd[1]);
+            for (var i = 0; i < intersections.length; i++) {
+                var p = intersections[i];
+                p[0] += cx;
+                p[1] += cy;
+            }
+            return intersections;
+        },
+        length: function () {
+            return length;
+        },
+        x: function () {
+            return cx;
+        },
+        y: function () {
+            return cy;
+        }
     }
 }
 
@@ -187,38 +240,43 @@ function plotterControls(plotter, pulleyC1, pulleyC2) {
     }
 
     return {
-        update: function() {
+        update: function () {
             var plotterPos = pulleyIntersection();
             plotterX = plotterPos[0];
             plotterY = plotterPos[1];
-
 
             belt1.attr('x2', plotterX).attr('y2', plotterY);
             belt2.attr('x2', plotterX).attr('y2', plotterY);
 
             plotterHead.attr('transform', 'translate(' + plotterX + ',' + plotterY + ')');
         },
-        pos: function() { return [plotterX, plotterY]; }
+        pos: function () {
+            return [plotterX, plotterY];
+        }
     }
 }
 
 function lineControl(line) {
     return {
-      hide: function() {
-        line.attr('opacity', 0)
-      },
-      show: function(start, end) {
-        line.attr('opacity', 1)
-            .attr('x1', start[0])
-            .attr('y1', start[1])
-            .attr('x2', end[0])
-            .attr('y2', end[1]);
-      }
+        hide: function () {
+            line.attr('opacity', 0)
+        },
+        show: function (start, end) {
+            line.attr('opacity', 1)
+                .attr('x1', start[0])
+                .attr('y1', start[1])
+                .attr('x2', end[0])
+                .attr('y2', end[1]);
+        }
     }
 }
 
-var lPulleyControls = pulleyControls(lPulley, {dir:  1}),
-    rPulleyControls = pulleyControls(rPulley, {dir: -1});
+var lPulleyControls = pulleyControls(lPulley, {
+        dir: 1
+    }),
+    rPulleyControls = pulleyControls(rPulley, {
+        dir: -1
+    });
 
 var mainPlotterControls = plotterControls(plotter, lPulleyControls, rPulleyControls);
 
@@ -235,49 +293,59 @@ var x = d3.scaleLinear().range([plotAreaX1, plotAreaX2]),
 
 // START UI LOGIC
 var Key = {
-  _pressed: {},
+    _pressed: {},
 
-  LEFT: 37,
-  UP: 38,
-  RIGHT: 39,
-  DOWN: 40,
+    LEFT: 37,
+    UP: 38,
+    RIGHT: 39,
+    DOWN: 40,
 
-  isDown: function(keyCode) {
-    return this._pressed[keyCode];
-  },
+    isDown: function (keyCode) {
+        return this._pressed[keyCode];
+    },
 
-  onKeydown: function(event) {
-    this._pressed[event.keyCode] = true;
-  },
+    onKeydown: function (event) {
+        this._pressed[event.keyCode] = true;
+    },
 
-  onKeyup: function(event) {
-    delete this._pressed[event.keyCode];
-  }
+    onKeyup: function (event) {
+        delete this._pressed[event.keyCode];
+    }
 };
 
-window.addEventListener('keyup', function(event) { Key.onKeyup(event); }, false);
-window.addEventListener('keydown', function(event) { Key.onKeydown(event); }, false);
+window.addEventListener('keyup', function (event) {
+    Key.onKeyup(event);
+}, false);
+window.addEventListener('keydown', function (event) {
+    Key.onKeydown(event);
+}, false);
 
 var startDrag;
 var endDrag;
-hover.on('mousedown', function(event) {
-  startDrag = d3.mouse(this);
-  endDrag = undefined;
-  d3.event.stopPropagation();
+hover.on('mousedown', function (event) {
+    startDrag = d3.mouse(this);
+    endDrag = undefined;
+    d3.event.stopPropagation();
 });
 
-hover.on('mousemove', function(event) {
-  if (startDrag == undefined || endDrag != undefined)
-    return;
+hover.on('mousemove', function (event) {
+    if (startDrag == undefined || endDrag != undefined)
+        return;
 
-  dragLineControls.show(startDrag, d3.mouse(this));
-  d3.event.stopPropagation();
+    var curDrag = d3.mouse(this);
+    intersectPoints.render(lPulleyControls.intersect(startDrag, curDrag).concat(rPulleyControls.intersect(startDrag, curDrag)));
+    dragLineControls.show(startDrag, curDrag);
+
+    d3.event.stopPropagation();
 });
 
-hover.on('mouseup', function(event) {
-  endDrag = d3.mouse(this);
-  dragLineControls.show(startDrag, endDrag);
-  d3.event.stopPropagation();
+hover.on('mouseup', function (event) {
+    endDrag = d3.mouse(this);
+
+    intersectPoints.render(lPulleyControls.intersect(startDrag, endDrag).concat(rPulleyControls.intersect(startDrag, endDrag)));
+    dragLineControls.show(startDrag, endDrag);
+
+    d3.event.stopPropagation();
 });
 // END UI LOGIC
 
@@ -297,6 +365,7 @@ step
 
 // START CONTROLLER LOGIC
 mainPlotterControls.update();
+
 function loop() {
     var speed = 10;
 
